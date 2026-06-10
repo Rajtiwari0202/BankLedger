@@ -12,8 +12,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Verify the connection configuration
-transporter.verify((error, success) => {
+transporter.verify((error) => {
   if (error) {
     console.error("Error connecting to email server:", error);
   } else {
@@ -21,31 +20,199 @@ transporter.verify((error, success) => {
   }
 });
 
-// Function to send email
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(amount);
+};
+
 const sendEmail = async (to, subject, text, html) => {
   try {
     const info = await transporter.sendMail({
-      from: `"Backend Ledger" <${process.env.EMAIL_USER}>`, // sender address
-      to, // list of receivers
-      subject, // Subject line
-      text, // plain text body
-      html, // html body
+      from: `"BankLedger" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      text,
+      html,
     });
 
-    console.log("Message sent: %s", info.messageId);
-    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    console.log("Message sent:", info.messageId);
+
+    return info;
   } catch (error) {
     console.error("Error sending email:", error);
+    throw error;
   }
 };
 
 async function sendRegistrationEmail(userEmail, name) {
-  const subject = 'Welcome to Backend Ledger!';
-  const text = `Hello ${name}, \n\nThanku you for registering at Backend Ledger. We're excited to have you on board!\n\nBest Regards,\n The Backend Ledger Teams`;
-  const html = `<p>Hello ${name},</p> <p>Thank you for registering at Backend Ledger, We're excited to have you on board!</p><p>Best Regards.<br>The Backend Ledger Team</p>`;
+  const subject = "Welcome to BankLedger";
 
-  await sendEmail(userEmail,subject,text,html);
+  const text = `Hello ${name},
+
+Thank you for registering at BankLedger. We're excited to have you on board.
+
+Best Regards,
+The BankLedger Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Welcome to BankLedger</h2>
+
+      <p>Hello ${name},</p>
+
+      <p>
+        Thank you for registering at BankLedger.
+        We're excited to have you on board.
+      </p>
+
+      <p>
+        Best Regards,<br/>
+        The BankLedger Team
+      </p>
+    </div>
+  `;
+
+  return await sendEmail(userEmail, subject, text, html);
 }
+
+async function sendTransactionEmail(userEmail, name, amount, toAccount) {
+  const formattedAmount = formatCurrency(amount);
+
+  const subject = "Transaction Successful";
+
+  const text = `Hello ${name},
+
+Your transaction has been processed successfully.
+
+Amount: ${formattedAmount}
+Transferred To: ${toAccount}
+
+Thank you for using BankLedger.
+
+Regards,
+BankLedger Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Transaction Confirmation</h2>
+
+      <p>Hello ${name},</p>
+
+      <p>Your transaction has been processed successfully.</p>
+
+      <table style="border-collapse: collapse; width: 100%; max-width: 500px;">
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            <strong>Amount</strong>
+          </td>
+
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            ${formattedAmount}
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            <strong>Transferred To</strong>
+          </td>
+
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            ${toAccount}
+          </td>
+        </tr>
+      </table>
+
+      <p style="margin-top: 20px;">
+        Thank you for using BankLedger.
+      </p>
+
+      <p>
+        Regards,<br/>
+        BankLedger Team
+      </p>
+    </div>
+  `;
+
+  return await sendEmail(userEmail, subject, text, html);
+}
+
+async function sendFailedTransactionEmail(
+  userEmail,
+  name,
+  amount,
+  toAccount,
+  reason = "Transaction could not be completed",
+) {
+  const formattedAmount = formatCurrency(amount);
+
+  const subject = "Transaction Failed";
+
+  const text = `Hello ${name},
+
+Your transaction could not be completed.
+
+Amount: ${formattedAmount}
+Transferred To: ${toAccount}
+Reason: ${reason}
+
+Regards,
+BankLedger Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Transaction Failed</h2>
+
+      <p>Hello ${name},</p>
+
+      <p>Your transaction could not be completed.</p>
+
+      <table style="border-collapse: collapse; width: 100%; max-width: 500px;">
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            <strong>Amount</strong>
+          </td>
+
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            ${formattedAmount}
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            <strong>Transferred To</strong>
+          </td>
+
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            ${toAccount}
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            <strong>Reason</strong>
+          </td>
+
+          <td style="padding: 8px; border: 1px solid #ddd;">
+            ${reason}
+          </td>
+        </tr>
+      </table>
+
+      <p>
+        Regards,<br/>
+        BankLedger Team
+      </p>
+    </div>
+  `;
+
+  return await sendEmail(userEmail, subject, text, html);
+}
+
 module.exports = {
-  sendRegistrationEmail
+  sendEmail,
+  sendRegistrationEmail,
+  sendTransactionEmail,
+  sendFailedTransactionEmail,
 };

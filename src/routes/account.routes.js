@@ -13,6 +13,7 @@ const router = express.Router();
 router.post(
   "/",
   authMiddleware.authMiddleware,
-  accountController.createAccountController,
+  accountController.createAccountController
 );
+
 module.exports = router;

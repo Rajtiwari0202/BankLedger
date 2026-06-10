@@ -26,4 +26,15 @@ router.get(
   accountController.getAccountsController
 );
 
+/**
+ * GET /api/accounts/:accountId/balance
+ * Get balance of a specific account
+ * Protected Route
+ */
+router.get(
+  "/:accountId/balance",
+  authMiddleware.authMiddleware,
+  accountController.getAccountBalanceController
+);
+
 module.exports = router;

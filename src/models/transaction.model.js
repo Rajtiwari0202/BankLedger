@@ -26,20 +26,23 @@ const transactionSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: [true, "Amount is required for creating a transaction"],
-    min: [0, "Transaction amount cannot be negative"],
+    min: [1, "Transaction amount must be greater than 0"],
   },
 
   idempotencyKey: {
     type: String,
     required: [true, "Idempotency key is required for creating a transaction"],
-    index: true,
     unique: true,
+    index: true,
   },
 
 }, {
   timestamps: true,
 });
 
-const transactionModel = mongoose.model("transaction",transactionSchema);
+const transactionModel = mongoose.model(
+  "transaction",
+  transactionSchema
+);
 
-module.exports = transactionModel
+module.exports = transactionModel;

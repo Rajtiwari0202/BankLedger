@@ -5,36 +5,35 @@ const accountModel = require("../models/account.model");
 const mongoose = require("mongoose");
 
 /**
- * - Create a new transaction
+ * POST /api/transactions
+ *
+ * Create a normal user-to-user transaction.
  *
  * THE 10-STEP TRANSFER FLOW:
  * 1. Validate request
  * 2. Validate idempotency key
- * 3. Check account status
+ * 3. Check account ownership and account status
  * 4. Derive sender balance from ledger
- * 5. Create transaction (PENDING)
- * 6. Create DEBIT ledger entry
- * 7. Create CREDIT ledger entry
- * 8. Mark Transaction Completed
- * 9. Commit MongoDB session
+ * 5. Create transaction with PENDING status
+ * 6. Create DEBIT ledger entry for sender
+ * 7. Create CREDIT ledger entry for receiver
+ * 8. Mark transaction as COMPLETED
+ * 9. Commit MongoDB transaction session
  * 10. Send email notification
  */
-
 async function createTransaction(req, res) {
   const session = await mongoose.startSession();
 
   try {
-
     /**
      * 1. Validate Request
      */
-
-    const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
+    const { fromAccount, toAccount, idempotencyKey } = req.body;
+    const amount = Number(req.body.amount);
 
     if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
       return res.status(400).json({
-        message:
-          "fromAccount, toAccount, amount and idempotencyKey are required",
+        message: "fromAccount, toAccount, amount and idempotencyKey are required",
       });
     }
 
@@ -53,13 +52,11 @@ async function createTransaction(req, res) {
     /**
      * 2. Validate Idempotency Key
      */
-
     const existingTransaction = await transactionModel.findOne({
       idempotencyKey,
     });
 
     if (existingTransaction) {
-
       if (existingTransaction.status === "COMPLETED") {
         return res.status(200).json({
           message: "Transaction already processed",
@@ -79,10 +76,12 @@ async function createTransaction(req, res) {
     }
 
     /**
-     * 3. Check Account Status
+     * 3. Check Account Ownership and Account Status
      */
-
-    const fromUserAccount = await accountModel.findById(fromAccount);
+    const fromUserAccount = await accountModel.findOne({
+      _id: fromAccount,
+      user: req.user._id,
+    });
 
     const toUserAccount = await accountModel.findById(toAccount);
 
@@ -97,15 +96,13 @@ async function createTransaction(req, res) {
       toUserAccount.status !== "ACTIVE"
     ) {
       return res.status(400).json({
-        message:
-          "Both fromAccount and toAccount must be active to process transaction",
+        message: "Both fromAccount and toAccount must be active to process transaction",
       });
     }
 
     /**
      * 4. Derive Sender Balance From Ledger
      */
-
     const balance = await fromUserAccount.getBalance();
 
     if (balance < amount) {
@@ -117,7 +114,6 @@ async function createTransaction(req, res) {
     /**
      * 5. Create Transaction (PENDING)
      */
-
     session.startTransaction();
 
     const [transaction] = await transactionModel.create(
@@ -136,8 +132,7 @@ async function createTransaction(req, res) {
     /**
      * 6. Create DEBIT Ledger Entry
      */
-
-    await ledgerModel.create(
+    const [debitLedgerEntry] = await ledgerModel.create(
       [
         {
           account: fromAccount,
@@ -152,8 +147,7 @@ async function createTransaction(req, res) {
     /**
      * 7. Create CREDIT Ledger Entry
      */
-
-    await ledgerModel.create(
+    const [creditLedgerEntry] = await ledgerModel.create(
       [
         {
           account: toAccount,
@@ -168,61 +162,66 @@ async function createTransaction(req, res) {
     /**
      * 8. Mark Transaction Completed
      */
-
     transaction.status = "COMPLETED";
-
     await transaction.save({ session });
 
     /**
      * 9. Commit MongoDB Session
      */
-
     await session.commitTransaction();
 
     /**
      * 10. Send Email Notification
      */
-
-    if (req.user?.email) {
-      await emailService.sendTransactionEmail(
-        req.user.email,
-        req.user.name,
-        amount,
-        toAccount
-      );
+    try {
+      if (req.user?.email) {
+        await emailService.sendTransactionEmail(
+          req.user.email,
+          req.user.name,
+          amount,
+          toAccount
+        );
+      }
+    } catch (emailError) {
+      console.error("Transaction email failed:", emailError.message);
     }
 
     return res.status(201).json({
       message: "Transaction completed successfully",
       transaction,
+      debitLedgerEntry,
+      creditLedgerEntry,
     });
-
   } catch (error) {
-
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
 
     return res.status(500).json({
       message: "Transaction failed",
       error: error.message,
     });
-
   } finally {
-
     session.endSession();
-
   }
 }
 
+/**
+ * POST /api/transactions/initial-funds
+ *
+ * Add initial funds to a user account using the internal system account.
+ * This creates one DEBIT entry from the system account and one CREDIT entry
+ * to the receiver account.
+ */
 async function createInitialFundsTransaction(req, res) {
   const session = await mongoose.startSession();
 
   try {
-
     /**
      * 1. Validate Request
      */
-
-    const { toAccount, amount, idempotencyKey } = req.body;
+    const { toAccount, idempotencyKey } = req.body;
+    const amount = Number(req.body.amount);
 
     if (!toAccount || !amount || !idempotencyKey) {
       return res.status(400).json({
@@ -239,7 +238,6 @@ async function createInitialFundsTransaction(req, res) {
     /**
      * 2. Validate Idempotency Key
      */
-
     const existingTransaction = await transactionModel.findOne({
       idempotencyKey,
     });
@@ -254,7 +252,6 @@ async function createInitialFundsTransaction(req, res) {
     /**
      * 3. Validate Receiver Account
      */
-
     const toUserAccount = await accountModel.findById(toAccount);
 
     if (!toUserAccount) {
@@ -263,13 +260,21 @@ async function createInitialFundsTransaction(req, res) {
       });
     }
 
+    if (toUserAccount.status !== "ACTIVE") {
+      return res.status(400).json({
+        message: "Receiver account must be active",
+      });
+    }
+
     /**
      * 4. Find System Account
      */
-
-    const systemAccount = await accountModel.findOne({
-      systemAccount: true,
-    });
+    const systemAccount = await accountModel
+      .findOne({
+        systemAccount: true,
+        status: "ACTIVE",
+      })
+      .select("+systemAccount");
 
     if (!systemAccount) {
       return res.status(400).json({
@@ -280,13 +285,11 @@ async function createInitialFundsTransaction(req, res) {
     /**
      * 5. Start MongoDB Transaction Session
      */
-
     session.startTransaction();
 
     /**
      * 6. Create Transaction (PENDING)
      */
-
     const [transaction] = await transactionModel.create(
       [
         {
@@ -303,7 +306,6 @@ async function createInitialFundsTransaction(req, res) {
     /**
      * 7. Create DEBIT Ledger Entry
      */
-
     const [debitLedgerEntry] = await ledgerModel.create(
       [
         {
@@ -319,7 +321,6 @@ async function createInitialFundsTransaction(req, res) {
     /**
      * 8. Create CREDIT Ledger Entry
      */
-
     const [creditLedgerEntry] = await ledgerModel.create(
       [
         {
@@ -335,15 +336,12 @@ async function createInitialFundsTransaction(req, res) {
     /**
      * 9. Mark Transaction Completed
      */
-
     transaction.status = "COMPLETED";
-
     await transaction.save({ session });
 
     /**
      * 10. Commit MongoDB Transaction
      */
-
     await session.commitTransaction();
 
     return res.status(201).json({
@@ -352,20 +350,17 @@ async function createInitialFundsTransaction(req, res) {
       debitLedgerEntry,
       creditLedgerEntry,
     });
-
   } catch (error) {
-
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
 
     return res.status(500).json({
       message: "Initial funding failed",
       error: error.message,
     });
-
   } finally {
-
     session.endSession();
-
   }
 }
 

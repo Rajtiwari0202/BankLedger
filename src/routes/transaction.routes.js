@@ -5,15 +5,17 @@ const {
   createInitialFundsTransaction,
 } = require("../controllers/transaction.controller");
 
-const { authMiddleware } = require("../middleware/auth.middleware");
+const {
+  authMiddleware,
+  authSystemUserMiddleware,
+} = require("../middleware/auth.middleware");
 
 const transactionRoutes = express.Router();
 
 /**
- * POST /api/transactions/
+ * POST /api/transactions
  * Create normal user-to-user transaction
  */
-
 transactionRoutes.post(
   "/",
   authMiddleware,
@@ -23,11 +25,11 @@ transactionRoutes.post(
 /**
  * POST /api/transactions/initial-funds
  * Add initial funds from system account
+ * System User Only
  */
-
 transactionRoutes.post(
   "/initial-funds",
-  authMiddleware,
+  authSystemUserMiddleware,
   createInitialFundsTransaction
 );
 

@@ -1,7 +1,8 @@
 const accountModel = require("../models/account.model");
 
 /**
- * Create Account
+ * POST /api/accounts
+ * Create a new account for the authenticated user
  */
 async function createAccountController(req, res) {
   try {
@@ -36,7 +37,8 @@ async function createAccountController(req, res) {
 }
 
 /**
- * Get Logged-in User Accounts
+ * GET /api/accounts
+ * Get all accounts belonging to the authenticated user
  */
 async function getAccountsController(req, res) {
   try {
@@ -74,27 +76,41 @@ async function getAccountsController(req, res) {
   }
 }
 
-async function getAccountBalanceController(req,res){
-  const { accountId } = req.params
+/**
+ * GET /api/accounts/:accountId/balance
+ * Get balance of a specific account owned by the authenticated user
+ */
+async function getAccountBalanceController(req, res) {
+  try {
+    const { accountId } = req.params;
 
-  const account = await accountModel.findOne({
-    _id:accountId,
-    user:req.user._id
-  })
-  if(!account){
-    return res.status(404).json({
-      message:"Account not found"
-    })
+    const account = await accountModel.findOne({
+      _id: accountId,
+      user: req.user._id,
+    });
+
+    if (!account) {
+      return res.status(404).json({
+        message: "Account not found",
+      });
+    }
+
+    const balance = await account.getBalance();
+
+    return res.status(200).json({
+      accountId: account._id,
+      balance,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch account balance",
+      error: error.message,
+    });
   }
-  const balance = await account.getBalance();
-  res.status(200).json({
-    accountId:account._id,
-    balance:balance
-  })
 }
 
 module.exports = {
   createAccountController,
   getAccountsController,
-  getAccountBalanceController
+  getAccountBalanceController,
 };

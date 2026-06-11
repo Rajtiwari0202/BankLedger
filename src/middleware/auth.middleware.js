@@ -2,8 +2,21 @@ const userModel = require("../models/user.model");
 const jwt = require("jsonwebtoken");
 const tokenBlacklistModel = require("../models/tokenBlacklist.model");
 
+/**
+ * Middleware Helper
+ * Extract token from Authorization header or cookie.
+ * Header is prioritized to avoid old cookies overriding Postman Bearer tokens.
+ */
+function getTokenFromRequest(req) {
+  return req.headers.authorization?.split(" ")[1] || req.cookies.token;
+}
+
+/**
+ * Protected Route Middleware
+ * Verifies JWT, checks blacklist, and attaches logged-in user to req.user.
+ */
 async function authMiddleware(req, res, next) {
-  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+  const token = getTokenFromRequest(req);
 
   if (!token) {
     return res.status(401).json({
@@ -40,8 +53,12 @@ async function authMiddleware(req, res, next) {
   }
 }
 
+/**
+ * System User Middleware
+ * Allows access only if the authenticated user has systemUser=true.
+ */
 async function authSystemUserMiddleware(req, res, next) {
-  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+  const token = getTokenFromRequest(req);
 
   if (!token) {
     return res.status(401).json({

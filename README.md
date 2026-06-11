@@ -1,179 +1,219 @@
 # BankLedger
 
-BankLedger is a backend-focused banking and ledger management system built with Node.js, Express, MongoDB, and Mongoose.
+A production-inspired digital banking backend built with Node.js, Express, MongoDB, and Mongoose.
 
-The project focuses on secure account management, transaction processing, immutable ledger records, authentication, and email integration using Gmail OAuth2.
+Unlike traditional CRUD banking demos, BankLedger implements immutable ledger accounting, idempotent money transfers, MongoDB transaction sessions, JWT token blacklisting, and system-funded account initialization.
 
 ---
 
-## Features
+## Architecture Overview
 
-### Authentication & Security
+BankLedger follows a ledger-first accounting model.
 
-* JWT-based authentication
-* Password hashing with bcrypt
-* Protected routes and middleware
-* Environment-based configuration
-* Gmail OAuth2 integration with Nodemailer
+Balances are never stored directly in the database.
+
+Instead, every transaction generates immutable ledger entries and account balances are derived from transaction history.
+
+This approach provides:
+
+* Auditability
+* Consistency
+* Transaction traceability
+* Reduced risk of balance corruption
+
+---
+
+## Core Features
+
+### Authentication
+
+* User Registration
+* User Login
+* JWT Authentication
+* Secure HTTP-only Cookies
+* JWT Token Blacklisting
+* Logout Support
 
 ### Account Management
 
-* Create and manage accounts
-* Account status handling
-* Currency support
-* Indexed account queries
+* Create Account
+* Retrieve User Accounts
+* Account Ownership Validation
+* Account Status Management
 
-### Transaction System
+  * ACTIVE
+  * FROZEN
+  * CLOSED
 
-* Credit and debit transaction flow
-* Transaction status tracking
-* Idempotency support
-* Atomic transaction-ready architecture
+### Ledger System
 
-### Immutable Ledger System
+* Immutable Ledger Entries
+* Credit Entries
+* Debit Entries
+* Transaction References
+* Update/Delete Protection
 
-* Immutable ledger entries
-* Linked transaction references
-* Credit/debit record tracking
-* Middleware protection against modifications or deletion
+### Transactions
+
+* User-to-User Transfers
+* Idempotency Protection
+* Duplicate Request Prevention
+* Transaction Status Tracking
+
+Supported statuses:
+
+* PENDING
+* COMPLETED
+* FAILED
+* REVERSED
+
+### Initial Funding System
+
+System-funded account initialization through a dedicated internal account.
+
+Allows controlled creation of funds without exposing minting functionality to normal users.
+
+### Notifications
+
+Email notifications for:
+
+* User Registration
+* Successful Transactions
+* Failed Transactions
+
+---
+
+## Double Entry Accounting
+
+Every transfer generates two ledger entries.
+
+Example:
+
+User A sends ₹1000 to User B
+
+Debit Entry
+
+Account: User A
+Amount: ₹1000
+Type: DEBIT
+
+Credit Entry
+
+Account: User B
+Amount: ₹1000
+Type: CREDIT
+
+Result:
+
+User A Balance = Previous Balance - ₹1000
+
+User B Balance = Previous Balance + ₹1000
+
+---
+
+## Balance Calculation
+
+Balances are calculated dynamically from ledger entries.
+
+Formula:
+
+Balance = Total Credits - Total Debits
+
+No mutable balance field exists inside the Account model.
+
+This prevents balance drift and maintains accounting integrity.
+
+---
+
+## Transaction Flow
+
+1. Validate Request
+2. Validate Idempotency Key
+3. Validate Account Status
+4. Derive Current Balance
+5. Create Transaction (PENDING)
+6. Create Debit Ledger Entry
+7. Create Credit Ledger Entry
+8. Mark Transaction COMPLETED
+9. Commit MongoDB Transaction
+10. Send Notification
 
 ---
 
 ## Tech Stack
 
-| Category          | Technologies             |
-| ----------------- | ------------------------ |
-| Runtime           | Node.js                  |
-| Framework         | Express.js               |
-| Database          | MongoDB                  |
-| ODM               | Mongoose                 |
-| Authentication    | JWT, bcryptjs            |
-| Email Service     | Nodemailer, Gmail OAuth2 |
-| Development Tools | Nodemon, dotenv          |
+Backend:
+
+* Node.js
+* Express.js
+
+Database:
+
+* MongoDB
+* Mongoose
+
+Authentication:
+
+* JWT
+* Cookie Parser
+
+Email:
+
+* Nodemailer
+* Gmail OAuth2
+
+Security:
+
+* Token Blacklisting
+* Protected Routes
+* Account Ownership Validation
+
+Database Consistency:
+
+* MongoDB Sessions
+* ACID Transactions
 
 ---
 
-## Project Structure
+## API Endpoints
 
-```bash id="v56j0v"
-src/
-│
-├── config/
-├── controllers/
-├── middleware/
-├── models/
-├── routes/
-├── services/
-├── utils/
-│
-├── app.js
-└── server.js
-```
+Authentication
 
----
+POST /api/auth/register
 
-## Environment Variables
+POST /api/auth/login
 
-Create a `.env` file in the root directory.
+POST /api/auth/logout
 
-```env id="t6nk8e"
-PORT=3000
+Accounts
 
-MONGODB_URI=your_mongodb_connection_string
+POST /api/accounts
 
-JWT_SECRET=your_jwt_secret
+GET /api/accounts
 
-EMAIL_USER=your_email@gmail.com
+GET /api/accounts/:accountId/balance
 
-GOOGLE_CLIENT_ID=your_google_client_id
+Transactions
 
-GOOGLE_CLIENT_SECRET=your_google_client_secret
+POST /api/transactions
 
-GOOGLE_REFRESH_TOKEN=your_google_refresh_token
-```
-
----
-
-## Installation
-
-Clone the repository:
-
-```bash id="tr9h10"
-git clone https://github.com/Rajtiwari0202/BankLedger.git
-```
-
-Move into the project directory:
-
-```bash id="t6q5tb"
-cd BankLedger
-```
-
-Install dependencies:
-
-```bash id="m7pxx7"
-npm install
-```
-
-Start the development server:
-
-```bash id="qz9n99"
-npm run dev
-```
-
----
-
-## Core Models
-
-### Account
-
-Stores user banking account information and account status.
-
-### Transaction
-
-Handles transfer records between accounts with transaction state management and idempotency support.
-
-### Ledger
-
-Maintains immutable financial records associated with transactions.
-
----
-
-## API Architecture
-
-The backend follows a modular architecture:
-
-* Controllers handle request logic
-* Routes define API endpoints
-* Middleware handles authentication and validation
-* Models define database structure
-* Services isolate business logic
+POST /api/transactions/initial-funds
 
 ---
 
 ## Future Improvements
 
-* Database transactions using MongoDB sessions
-* OTP verification flow
-* Password reset system
-* Role-based access control
-* Rate limiting
-* Audit logging
-* Statement generation
-* Swagger/OpenAPI documentation
-* Docker support
-* Unit and integration testing
-
----
-
-## Author
-
-Raj Tiwari
-
-GitHub: https://github.com/Rajtiwari0202
-LinkedIn: https://www.linkedin.com/in/raj-tiwari-687b67284
+* Transaction History APIs
+* Monthly Statements
+* Scheduled Transfers
+* Multi-Currency Support
+* Rate Limiting
+* Admin Dashboard
+* Fraud Detection Rules
+* Webhook Notifications
 
 ---
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License

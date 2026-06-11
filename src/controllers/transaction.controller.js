@@ -12,6 +12,12 @@ function getPagination(query) {
   return { page, limit, skip };
 }
 
+function sendEmailInBackground(task, label) {
+  task().catch((emailError) => {
+    console.error(`${label} email failed:`, emailError.message);
+  });
+}
+
 async function getOwnedAccountIds(userId) {
   const accounts = await accountModel.find({ user: userId }).select("_id");
   return accounts.map((account) => account._id);
@@ -319,25 +325,26 @@ async function createTransaction(req, res) {
     /**
      * 10. Send Email Notification
      */
-    try {
-      if (req.user?.email) {
-        await emailService.sendTransactionEmail(
-          req.user.email,
-          req.user.name,
-          amount,
-          toAccount
-        );
-      }
-    } catch (emailError) {
-      console.error("Transaction email failed:", emailError.message);
-    }
-
-    return res.status(201).json({
+    const response = res.status(201).json({
       message: "Transaction completed successfully",
       transaction,
       debitLedgerEntry,
       creditLedgerEntry,
     });
+
+    if (req.user?.email) {
+      sendEmailInBackground(
+        () => emailService.sendTransactionEmail(
+          req.user.email,
+          req.user.name,
+          amount,
+          toAccount
+        ),
+        "Transaction"
+      );
+    }
+
+    return response;
   } catch (error) {
     if (session.inTransaction()) {
       await session.abortTransaction();

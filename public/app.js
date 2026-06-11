@@ -30,6 +30,21 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => els.toast.classList.add("hidden"), 3500);
 }
 
+function setFormBusy(form, isBusy, label = "Working...") {
+  const button = form.querySelector("button[type='submit']");
+
+  if (!button) return;
+
+  if (isBusy) {
+    button.dataset.originalText = button.textContent;
+    button.textContent = label;
+    button.disabled = true;
+  } else {
+    button.textContent = button.dataset.originalText || button.textContent;
+    button.disabled = false;
+  }
+}
+
 function authHeaders() {
   return state.token ? { Authorization: `Bearer ${state.token}` } : {};
 }
@@ -246,6 +261,7 @@ async function loadApp() {
 }
 
 async function handleAuth(path, form) {
+  setFormBusy(form, true, path.includes("register") ? "Creating..." : "Signing in...");
   const data = await api(path, {
     method: "POST",
     body: JSON.stringify(formData(form)),
@@ -256,6 +272,7 @@ async function handleAuth(path, form) {
   form.reset();
   await loadApp();
   showToast(data.message);
+  setFormBusy(form, false);
 }
 
 function switchView(view) {
@@ -274,6 +291,7 @@ document.getElementById("loginForm").addEventListener("submit", async (event) =>
   try {
     await handleAuth("/api/auth/login", event.currentTarget);
   } catch (error) {
+    setFormBusy(event.currentTarget, false);
     showToast(error.message);
   }
 });
@@ -283,6 +301,7 @@ document.getElementById("registerForm").addEventListener("submit", async (event)
   try {
     await handleAuth("/api/auth/register", event.currentTarget);
   } catch (error) {
+    setFormBusy(event.currentTarget, false);
     showToast(error.message);
   }
 });
@@ -347,6 +366,7 @@ document.getElementById("generateKeyBtn").addEventListener("click", () => {
 
 document.getElementById("transferForm").addEventListener("submit", async (event) => {
   event.preventDefault();
+  setFormBusy(event.currentTarget, true, "Submitting...");
 
   try {
     const payload = formData(event.currentTarget);
@@ -360,7 +380,9 @@ document.getElementById("transferForm").addEventListener("submit", async (event)
     event.currentTarget.reset();
     showToast(data.message);
     await loadApp();
+    setFormBusy(event.currentTarget, false);
   } catch (error) {
+    setFormBusy(event.currentTarget, false);
     showToast(error.message);
   }
 });
@@ -383,6 +405,7 @@ document.getElementById("ledgerAccountFilter").addEventListener("change", (event
 
 document.getElementById("statementForm").addEventListener("submit", async (event) => {
   event.preventDefault();
+  setFormBusy(event.currentTarget, true, "Generating...");
 
   try {
     const values = formData(event.currentTarget);
@@ -419,7 +442,9 @@ document.getElementById("statementForm").addEventListener("submit", async (event
         </div>
       </section>
     `;
+    setFormBusy(event.currentTarget, false);
   } catch (error) {
+    setFormBusy(event.currentTarget, false);
     showToast(error.message);
   }
 });

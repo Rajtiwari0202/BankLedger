@@ -13,6 +13,12 @@ function authCookieOptions() {
   };
 }
 
+function sendEmailInBackground(task, label) {
+  task().catch((emailError) => {
+    console.error(`${label} email failed:`, emailError.message);
+  });
+}
+
 /**
  * POST /api/auth/register
  * Register a new user, create JWT token, set auth cookie, and send welcome email.
@@ -50,13 +56,7 @@ async function userRegisterController(req, res) {
 
     res.cookie("token", token, authCookieOptions());
 
-    try {
-      await emailService.sendRegistrationEmail(user.email, user.name);
-    } catch (emailError) {
-      console.error("Registration email failed:", emailError.message);
-    }
-
-    return res.status(201).json({
+    const response = res.status(201).json({
       message: "User registered successfully",
       user: {
         _id: user._id,
@@ -65,6 +65,13 @@ async function userRegisterController(req, res) {
       },
       token,
     });
+
+    sendEmailInBackground(
+      () => emailService.sendRegistrationEmail(user.email, user.name),
+      "Registration"
+    );
+
+    return response;
   } catch (error) {
     return res.status(500).json({
       message: "Internal server error",

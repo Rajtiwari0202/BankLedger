@@ -3,6 +3,16 @@ const jwt = require("jsonwebtoken");
 const emailService = require("../services/email.service");
 const tokenBlacklistModel = require("../models/tokenBlacklist.model");
 
+function authCookieOptions() {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  return {
+    httpOnly: true,
+    sameSite: isProduction ? "none" : "strict",
+    secure: isProduction,
+  };
+}
+
 /**
  * POST /api/auth/register
  * Register a new user, create JWT token, set auth cookie, and send welcome email.
@@ -38,10 +48,7 @@ async function userRegisterController(req, res) {
       { expiresIn: "3d" }
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: "strict",
-    });
+    res.cookie("token", token, authCookieOptions());
 
     try {
       await emailService.sendRegistrationEmail(user.email, user.name);
@@ -102,10 +109,7 @@ async function userLoginController(req, res) {
       { expiresIn: "3d" }
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      sameSite: "strict",
-    });
+    res.cookie("token", token, authCookieOptions());
 
     return res.status(200).json({
       message: "User logged in successfully",
@@ -151,10 +155,7 @@ async function logoutController(req, res) {
       });
     }
 
-    res.clearCookie("token", {
-      httpOnly: true,
-      sameSite: "strict",
-    });
+    res.clearCookie("token", authCookieOptions());
 
     return res.status(200).json({
       message: "Logged out successfully",
@@ -167,8 +168,24 @@ async function logoutController(req, res) {
   }
 }
 
+/**
+ * GET /api/auth/me
+ * Return the currently authenticated user profile.
+ */
+async function meController(req, res) {
+  return res.status(200).json({
+    user: {
+      _id: req.user._id,
+      email: req.user.email,
+      name: req.user.name,
+      createdAt: req.user.createdAt,
+    },
+  });
+}
+
 module.exports = {
   userRegisterController,
   userLoginController,
   logoutController,
+  meController,
 };

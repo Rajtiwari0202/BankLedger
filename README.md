@@ -37,6 +37,10 @@ Ledger service is up and running
 * Double Entry Accounting
 * Immutable Ledger Entries
 * Ledger-Based Balance Calculation
+* Browser-Based Banking Operations Console
+* Transaction History APIs
+* Account Statements
+* Ledger Audit APIs
 * MongoDB Transaction Sessions
 * Idempotent Transactions
 * System Account Funding
@@ -306,6 +310,12 @@ POST /api/auth/login
 POST /api/auth/logout
 ```
 
+#### Current User
+
+```http
+GET /api/auth/me
+```
+
 ---
 
 ### Accounts
@@ -328,9 +338,39 @@ GET /api/accounts
 GET /api/accounts/:accountId/balance
 ```
 
+#### Update Account Status
+
+```http
+PATCH /api/accounts/:accountId/status
+```
+
+#### Get Account Ledger
+
+```http
+GET /api/accounts/:accountId/ledger?page=1&limit=20
+```
+
+#### Get Account Statement
+
+```http
+GET /api/accounts/:accountId/statement?from=2026-01-01&to=2026-12-31
+```
+
 ---
 
 ### Transactions
+
+#### Get Transaction History
+
+```http
+GET /api/transactions?page=1&limit=20
+```
+
+#### Get Transaction Detail
+
+```http
+GET /api/transactions/:transactionId
+```
 
 #### Create Transaction
 
@@ -433,13 +473,43 @@ Run production server:
 npm start
 ```
 
+Open the banking operations console:
+
+```txt
+http://localhost:3000/app
+```
+
+---
+
+## Frontend Deployment
+
+The frontend lives in the `public` folder and is ready for Vercel static hosting.
+
+By default it connects to:
+
+```txt
+https://bankledger-hu91.onrender.com
+```
+
+To point the frontend somewhere else, update:
+
+```txt
+public/config.js
+```
+
+On Render, set one of these environment variables to your Vercel frontend URL after deployment:
+
+```env
+CLIENT_URL=https://your-vercel-app.vercel.app
+FRONTEND_URL=https://your-vercel-app.vercel.app
+```
+
+Localhost and `*.vercel.app` origins are already allowed by CORS.
+
 ---
 
 ## Future Improvements
 
-* Transaction History APIs
-* Account Statements
-* Pagination
 * Scheduled Transfers
 * Multi-Currency Support
 * Rate Limiting

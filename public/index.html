@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BankLedger Operations</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">BL</span>
+          <div>
+            <strong>BankLedger</strong>
+            <small>Core banking console</small>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <button class="nav-item active" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" data-view="accounts">Accounts</button>
+          <button class="nav-item" data-view="transfer">Transfer desk</button>
+          <button class="nav-item" data-view="history">Transactions</button>
+          <button class="nav-item" data-view="statement">Statements</button>
+          <button class="nav-item" data-view="audit">Ledger audit</button>
+        </nav>
+
+        <section class="session-panel">
+          <small>Signed in as</small>
+          <strong id="sessionName">Guest</strong>
+          <span id="sessionEmail">Not authenticated</span>
+          <button id="logoutBtn" class="ghost full">Log out</button>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Bank operations</p>
+            <h1 id="viewTitle">Dashboard</h1>
+          </div>
+          <div class="top-actions">
+            <button id="refreshBtn" class="ghost">Refresh</button>
+            <button id="createAccountBtn">New account</button>
+          </div>
+        </header>
+
+        <section id="authGate" class="auth-grid">
+          <form id="loginForm" class="auth-card">
+            <h2>Staff login</h2>
+            <label>Email<input name="email" type="email" required /></label>
+            <label>Password<input name="password" type="password" required /></label>
+            <button type="submit">Log in</button>
+          </form>
+
+          <form id="registerForm" class="auth-card">
+            <h2>Create customer profile</h2>
+            <label>Name<input name="name" type="text" required /></label>
+            <label>Email<input name="email" type="email" required /></label>
+            <label>Password<input name="password" type="password" minlength="6" required /></label>
+            <button type="submit">Register</button>
+          </form>
+        </section>
+
+        <section id="appPanel" class="hidden">
+          <section id="dashboard" class="view active">
+            <div class="metrics">
+              <article>
+                <span>Total balance</span>
+                <strong id="metricBalance">INR 0</strong>
+              </article>
+              <article>
+                <span>Open accounts</span>
+                <strong id="metricAccounts">0</strong>
+              </article>
+              <article>
+                <span>Recent transfers</span>
+                <strong id="metricTransactions">0</strong>
+              </article>
+              <article>
+                <span>Risk flags</span>
+                <strong id="metricRisk">0</strong>
+              </article>
+            </div>
+
+            <div class="split">
+              <section class="panel">
+                <div class="panel-head">
+                  <h2>Balance exposure</h2>
+                  <span>Derived from ledger</span>
+                </div>
+                <div id="balanceBars" class="bars"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <h2>Recent activity</h2>
+                  <span>Latest 5</span>
+                </div>
+                <div id="recentList" class="activity-list"></div>
+              </section>
+            </div>
+          </section>
+
+          <section id="accounts" class="view">
+            <div id="accountGrid" class="account-grid"></div>
+          </section>
+
+          <section id="transfer" class="view">
+            <form id="transferForm" class="panel form-grid">
+              <h2>Book user transfer</h2>
+              <label>From account<select name="fromAccount" required></select></label>
+              <label>To account ID<input name="toAccount" placeholder="Paste destination account ID" required /></label>
+              <label>Amount<input name="amount" type="number" min="1" step="1" required /></label>
+              <label>Idempotency key<input name="idempotencyKey" required /></label>
+              <button type="button" id="generateKeyBtn" class="ghost">Generate key</button>
+              <button type="submit">Submit transfer</button>
+            </form>
+          </section>
+
+          <section id="history" class="view">
+            <div class="panel">
+              <div class="panel-head controls">
+                <h2>Transaction monitor</h2>
+                <select id="historyAccountFilter"></select>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Direction</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                      <th>Counterparty</th>
+                      <th>Reference</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="statement" class="view">
+            <form id="statementForm" class="panel form-grid">
+              <h2>Generate statement</h2>
+              <label>Account<select name="accountId" required></select></label>
+              <label>From<input name="from" type="date" /></label>
+              <label>To<input name="to" type="date" /></label>
+              <button type="submit">Generate</button>
+            </form>
+            <div id="statementResult" class="statement-output"></div>
+          </section>
+
+          <section id="audit" class="view">
+            <div class="panel">
+              <div class="panel-head controls">
+                <h2>Immutable ledger audit</h2>
+                <select id="ledgerAccountFilter"></select>
+              </div>
+              <div id="ledgerRows" class="ledger-list"></div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="/config.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -4,6 +4,152 @@ const emailService = require("../services/email.service");
 const accountModel = require("../models/account.model");
 const mongoose = require("mongoose");
 
+function getPagination(query) {
+  const page = Math.max(Number(query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+  const skip = (page - 1) * limit;
+
+  return { page, limit, skip };
+}
+
+async function getOwnedAccountIds(userId) {
+  const accounts = await accountModel.find({ user: userId }).select("_id");
+  return accounts.map((account) => account._id);
+}
+
+/**
+ * GET /api/transactions
+ * Paginated history for transactions touching the logged-in user's accounts.
+ */
+async function getTransactions(req, res) {
+  try {
+    const { page, limit, skip } = getPagination(req.query);
+    const ownedAccountIds = await getOwnedAccountIds(req.user._id);
+    const filter = {
+      $or: [
+        { fromAccount: { $in: ownedAccountIds } },
+        { toAccount: { $in: ownedAccountIds } },
+      ],
+    };
+
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+
+    if (req.query.accountId) {
+      if (!mongoose.isValidObjectId(req.query.accountId)) {
+        return res.status(400).json({
+          message: "Invalid accountId filter",
+        });
+      }
+
+      const accountId = new mongoose.Types.ObjectId(req.query.accountId);
+
+      if (!ownedAccountIds.some((id) => id.equals(accountId))) {
+        return res.status(403).json({
+          message: "You can only filter by your own accounts",
+        });
+      }
+
+      filter.$or = [{ fromAccount: accountId }, { toAccount: accountId }];
+    }
+
+    const [transactions, total] = await Promise.all([
+      transactionModel
+        .find(filter)
+        .populate({
+          path: "fromAccount",
+          select: "status currency user systemAccount",
+          populate: { path: "user", select: "name email" },
+        })
+        .populate({
+          path: "toAccount",
+          select: "status currency user systemAccount",
+          populate: { path: "user", select: "name email" },
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      transactionModel.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      message: "Transactions fetched successfully",
+      transactions,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch transactions",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * GET /api/transactions/:transactionId
+ * One transaction plus its immutable ledger entries.
+ */
+async function getTransactionById(req, res) {
+  try {
+    const { transactionId } = req.params;
+
+    if (!mongoose.isValidObjectId(transactionId)) {
+      return res.status(400).json({
+        message: "Invalid transactionId",
+      });
+    }
+
+    const ownedAccountIds = await getOwnedAccountIds(req.user._id);
+
+    const transaction = await transactionModel
+      .findOne({
+        _id: transactionId,
+        $or: [
+          { fromAccount: { $in: ownedAccountIds } },
+          { toAccount: { $in: ownedAccountIds } },
+        ],
+      })
+      .populate({
+        path: "fromAccount",
+        select: "status currency user systemAccount",
+        populate: { path: "user", select: "name email" },
+      })
+      .populate({
+        path: "toAccount",
+        select: "status currency user systemAccount",
+        populate: { path: "user", select: "name email" },
+      });
+
+    if (!transaction) {
+      return res.status(404).json({
+        message: "Transaction not found",
+      });
+    }
+
+    const ledgerEntries = await ledgerModel
+      .find({ transaction: transaction._id })
+      .populate("account", "status currency user")
+      .sort({ createdAt: 1 });
+
+    return res.status(200).json({
+      message: "Transaction fetched successfully",
+      transaction,
+      ledgerEntries,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch transaction",
+      error: error.message,
+    });
+  }
+}
+
 /**
  * POST /api/transactions
  *
@@ -367,4 +513,6 @@ async function createInitialFundsTransaction(req, res) {
 module.exports = {
   createTransaction,
   createInitialFundsTransaction,
+  getTransactions,
+  getTransactionById,
 };
